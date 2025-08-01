@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Keranjang Belanja{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Keranjang Belanja</h1>
+
+    <div id="cart-items-container" class="space-y-4">
+        </div>
+    
+    <div id="empty-cart-message" class="text-center text-gray-600 py-12 hidden">
+        <i class="fas fa-shopping-cart text-6xl mb-4 text-gray-300"></i>
+        <p class="text-xl font-semibold">Keranjangmu masih kosong</p>
+        <p class="mt-2 text-gray-500">Yuk, isi keranjangmu dengan produk-produk menarik!</p>
+        <a href="{{ url_for('dashboard') }}" class="mt-6 inline-block bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition duration-300 font-semibold">Mulai Belanja</a>
+    </div>
+
+    <form id="checkout-form" action="{{ url_for('checkout') }}" method="POST" class="hidden">
+        <div id="cart-summary" class="mt-8 bg-gray-50 p-6 rounded-lg">
+            <div class="flex justify-between items-center text-xl font-bold text-gray-800">
+                <span>Total:</span>
+                <span id="total-harga-keranjang">Rp 0</span>
+            </div>
+
+            <div class="mt-4">
+                <label for="catatan" class="block text-sm font-medium text-gray-700">Catatan untuk Penjual (Opsional):</label>
+                <textarea id="catatan" name="catatan" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"></textarea>
+            </div>
+            
+            <input type="hidden" name="cart_items" id="cart-items-input">
+
+            <button type="submit" class="mt-6 w-full bg-green-600 text-white font-semibold py-3 rounded-md hover:bg-green-700 transition duration-300">
+                <i class="fas fa-money-check-alt mr-2"></i>Checkout Sekarang
+            </button>
+        </div>
+    </form>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // Pastikan localStorage tersedia
+    if (typeof localStorage === 'undefined') {
+        alert('Browser Anda tidak mendukung LocalStorage. Tidak dapat menggunakan keranjang.');
+    }
+
+    function getCartItems() {
+        const cart = localStorage.getItem('cart');
+        return cart ? JSON.parse(cart) : [];
+    }
+
+    function renderCartItems() {
+        const cartItems = getCartItems();
+        const container = document.getElementById('cart-items-container');
+        const emptyMessage = document.getElementById('empty-cart-message');
+        const checkoutForm = document.getElementById('checkout-form');
+        
+        container.innerHTML = '';
+
+        if (cartItems.length === 0) {
+            emptyMessage.classList.remove('hidden');
+            checkoutForm.classList.add('hidden');
+            document.getElementById('cart-summary').classList.add('hidden');
+            document.getElementById('cart-items-input').value = '[]';
+            updateCartCountInNavbar();
+            return;
+        }
+
+        emptyMessage.classList.add('hidden');
+        checkoutForm.classList.remove('hidden');
+        document.getElementById('cart-summary').classList.remove('hidden');
+
+        cartItems.forEach(item => {
+            const itemElement = document.createElement('div');
+            itemElement.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg shadow-sm';
+            itemElement.id = `cart-item-${item.product_id}`;
+            itemElement.innerHTML = `
+                <div class="flex items-center space-x-4">
+                    <img src="${item.product_image || 'https://placehold.co/80x60/e0e0e0/ffffff?text=No+Image'}" alt="${item.product_name}" class="w-20 h-15 object-cover rounded-md shadow-sm">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">${item.product_name}</h3>
+                        <p class="text-gray-600">Harga: Rp ${new Intl.NumberFormat('id-ID').format(item.product_price)}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <button type="button" onclick="updateQuantity('${item.product_id}', -1)" class="bg-gray-200 text-gray-600 p-2 rounded-l-md hover:bg-gray-300 transition-colors duration-200">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <span class="w-10 text-center font-semibold bg-gray-100 p-2 border-t border-b border-gray-200" id="quantity-${item.product_id}">${item.jumlah}</span>
+                        <button type="button" onclick="updateQuantity('${item.product_id}', 1)" class="bg-gray-200 text-gray-600 p-2 rounded-r-md hover:bg-gray-300 transition-colors duration-200">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <span id="subtotal-${item.product_id}" class="font-bold text-lg text-blue-600 w-28 text-right">Rp ${new Intl.NumberFormat('id-ID').format(item.product_price * item.jumlah)}</span>
+                    <button type="button" onclick="removeFromCart('${item.product_id}')" class="text-red-500 hover:text-red-700 transition duration-200">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(itemElement);
+        });
+
+        updateTotal();
+        updateHiddenInput();
+    }
+
+    function updateHiddenInput() {
+        const cartItems = getCartItems();
+        document.getElementById('cart-items-input').value = JSON.stringify(cartItems);
+    }
+
+    function updateTotal() {
+        const cartItems = getCartItems();
+        const total = cartItems.reduce((sum, item) => sum + (item.product_price * item.jumlah), 0);
+        document.getElementById('total-harga-keranjang').textContent = `Rp ${new Intl.NumberFormat('id-ID').format(total)}`;
+    }
+
+    function removeFromCart(productId) {
+        let cart = getCartItems();
+        cart = cart.filter(item => item.product_id !== productId);
+        localStorage.setItem('cart', JSON.stringify(cart));
+        renderCartItems();
+    }
+
+    function updateQuantity(productId, change) {
+        let cart = getCartItems();
+        const itemIndex = cart.findIndex(item => item.product_id === productId);
+        
+        if (itemIndex > -1) {
+            cart[itemIndex].jumlah += change;
+            if (cart[itemIndex].jumlah <= 0) {
+                removeFromCart(productId);
+            } else {
+                localStorage.setItem('cart', JSON.stringify(cart));
+                renderCartItems();
+            }
+        }
+    }
+
+    document.getElementById('checkout-form').addEventListener('submit', (e) => {
+        const selectedItems = getCartItems();
+        if (selectedItems.length === 0) {
+            e.preventDefault();
+            Swal.fire('Keranjang Kosong', 'Pilih produk yang ingin dibeli.', 'warning');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Memproses Pesanan...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', renderCartItems);
+
+</script>
+{% endblock %}

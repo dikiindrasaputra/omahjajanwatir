@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Profil Pengguna{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center py-0 text-center">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Profil Pengguna</h1>
+        
+        {% if profile %}
+            <div class="flex items-center justify-center mb-6">
+                {% if profile.avatar_url %}
+                    <img src="{{ profile.avatar_url }}" alt="Avatar Pengguna" class="w-24 h-24 rounded-full object-cover shadow-md border-2 border-blue-400">
+                {% else %}
+                    <div class="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-4xl border-2 border-gray-400">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                {% endif %}
+            </div>
+            <form action="{{ url_for('profile') }}" method="post" class="space-y-4">
+                <div>
+                    <label for="username" class="block text-gray-700 text-sm font-bold mb-2 text-left">Username:</label>
+                    <input type="text" id="username" name="username" value="{{ profile.username }}" required
+                           class="shadow appearance-none border rounded-md w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                </div>
+                <div>
+                    <label for="nama_lengkap" class="block text-gray-700 text-sm font-bold mb-2 text-left">Nama Lengkap:</label>
+                    <input type="text" id="nama_lengkap" name="nama_lengkap" value="{{ profile.nama_lengkap }}" required
+                           class="shadow appearance-none border rounded-md w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                </div>
+                <div>
+                    <label for="avatar_url" class="block text-gray-700 text-sm font-bold mb-2 text-left">URL Avatar (opsional):</label>
+                    <input type="url" id="avatar_url" name="avatar_url" value="{{ profile.avatar_url if profile.avatar_url else '' }}"
+                           class="shadow appearance-none border rounded-md w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                </div>
+                <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md focus:outline-none focus:shadow-outline w-full transition duration-300 ease-in-out shadow-md">
+                    Perbarui Profil
+                </button>
+            </form>
+            <p class="text-gray-600 text-sm mt-4">ID Pengguna: {{ profile.user_id }}</p>
+            <p class="text-gray-600 text-sm">Dibuat Pada: {{ profile.created_at | format_datetime }}</p>
+        {% else %}
+            <p class="text-center text-gray-600">Data profil tidak ditemukan atau ada masalah.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

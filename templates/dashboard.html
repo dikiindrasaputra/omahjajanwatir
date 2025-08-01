@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Produk{% endblock %}
+
+{% block content %}
+<div class="py-0 relative z-10">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center md:text-left">Semua Produk</h1>
+    <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6" id="product-list">
+        {% if products %}
+            {% for product in products %}
+                <div class="bg-white rounded-lg shadow-md overflow-hidden transform transition duration-300 hover:scale-105 hover:shadow-lg cursor-pointer" onclick="showProductModal('{{ product.id }}')">
+                    <div class="w-full h-48 overflow-hidden">
+                        {% if product.product_images %}
+                            <img src="{{ product.product_images[0].product_url }}" alt="{{ product.nama }}" class="w-full h-full object-cover transition-transform duration-300 hover:scale-110">
+                        {% else %}
+                            <img src="https://placehold.co/400x300/e0e0e0/ffffff?text=No+Image" alt="No Image" class="w-full h-full object-cover">
+                        {% endif %}
+                    </div>
+                    <div class="p-4 flex flex-col flex-grow">
+                        <h2 class="text-md font-semibold text-gray-800 mb-1">{{ product.nama }}</h2>
+                        <p class="text-gray-600 text-sm mb-2">Stok: <span id="stok-{{ product.id }}">{{ product.stok }}</span></p>
+                        <p class="text-lg font-bold text-blue-600 mt-auto">Rp {{ "{:,.0f}".format(product.harga) }}</p>
+                    </div>
+                    <div class="p-4 border-t border-gray-100">
+                        <button type="button" onclick="addToCart('{{ product.id }}', '{{ product.nama }}', '{{ product.harga }}', '{{ product.product_images[0].product_url if product.product_images else '' }}', event)"
+                                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out font-medium">
+                            <i class="fas fa-shopping-cart mr-2"></i>Tambah
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="col-span-full text-center text-gray-600 mt-8">Belum ada produk yang tersedia.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div id="productModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden" onclick="closeProductModal()">
+    <div class="bg-white rounded-lg shadow-xl overflow-hidden max-w-4xl w-full flex flex-col md:flex-row relative" onclick="event.stopPropagation()">
+        <button onclick="closeProductModal()" class="absolute top-3 right-3 text-gray-600 hover:text-gray-900 z-10"><i class="fas fa-times-circle text-2xl bg-white rounded-full"></i></button>
+        
+        <div class="relative w-full md:w-1/2 flex items-center justify-center bg-gray-100">
+             <div id="image-slider-container" class="w-full h-96 overflow-hidden relative">
+                <div id="image-slider" class="flex h-full transition-transform duration-500">
+                    </div>
+            </div>
+            <button onclick="prevSlide(event)" class="absolute left-2 p-2 bg-white bg-opacity-50 rounded-full text-gray-800 hover:bg-opacity-80"><i class="fas fa-chevron-left"></i></button>
+            <button onclick="nextSlide(event)" class="absolute right-2 p-2 bg-white bg-opacity-50 rounded-full text-gray-800 hover:bg-opacity-80"><i class="fas fa-chevron-right"></i></button>
+        </div>
+
+        <div class="p-8 w-full md:w-1/2 flex flex-col justify-between">
+            <div>
+                <h2 id="modal-product-name" class="text-3xl font-bold text-gray-800 mb-2"></h2>
+                <p class="text-gray-600 text-sm mb-4">Stok: <span id="modal-product-stok"></span></p>
+                <p id="modal-product-price" class="text-2xl font-bold text-blue-600 mb-4"></p>
+                <div class="mt-4 border-t border-gray-200 pt-4">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Deskripsi Produk</h3>
+                    <p id="modal-product-description" class="text-gray-700"></p>
+                </div>
+            </div>
+            <div class="mt-6">
+                <button type="button" id="modal-add-to-cart-btn"
+                        class="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out font-semibold">
+                    <i class="fas fa-shopping-cart mr-2"></i>Tambah ke Keranjang
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentSlide = 0;
+    let productImages = [];
+    let modalProductData = {};
+
+    function showProductModal(productId) {
+        document.getElementById('productModal').classList.remove('hidden');
+        fetch(`/get-product-detail/${productId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const product = data.product;
+                    modalProductData = product; // Simpan data produk untuk fungsi add-to-cart
+                    document.getElementById('modal-product-name').textContent = product.nama;
+                    document.getElementById('modal-product-description').textContent = product.deskripsi || 'Tidak ada deskripsi.';
+                    document.getElementById('modal-product-stok').textContent = product.stok;
+                    document.getElementById('modal-product-price').textContent = `Rp ${new Intl.NumberFormat('id-ID').format(product.harga)}`;
+                    
+                    document.getElementById('modal-add-to-cart-btn').onclick = (e) => {
+                        e.stopPropagation();
+                        addToCart(product.id, product.nama, product.harga, (product.product_images && product.product_images[0] ? product.product_images[0].product_url : ''), e);
+                        closeProductModal();
+                    };
+
+                    productImages = product.product_images.map(img => img.product_url);
+                    currentSlide = 0;
+                    renderSlider();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function closeProductModal() {
+        document.getElementById('productModal').classList.add('hidden');
+        const sliderContainer = document.getElementById('image-slider');
+        if (sliderContainer) {
+            sliderContainer.innerHTML = '';
+        }
+    }
+
+    function renderSlider() {
+        const sliderContainer = document.getElementById('image-slider');
+        sliderContainer.innerHTML = '';
+        if (productImages && productImages.length > 0) {
+            productImages.forEach(url => {
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = 'Product Image';
+                img.classList.add('w-full', 'h-96', 'object-contain', 'flex-shrink-0');
+                sliderContainer.appendChild(img);
+            });
+        } else {
+             const noImage = document.createElement('img');
+             noImage.src = 'https://placehold.co/400x300/e0e0e0/ffffff?text=No+Image';
+             noImage.alt = 'No Image';
+             noImage.classList.add('w-full', 'h-96', 'object-contain', 'flex-shrink-0');
+             sliderContainer.appendChild(noImage);
+        }
+        updateSlider();
+    }
+
+    function updateSlider() {
+        const slider = document.getElementById('image-slider');
+        if (slider) {
+            const translateValue = -currentSlide * 100;
+            slider.style.transform = `translateX(${translateValue}%)`;
+        }
+    }
+
+    function prevSlide(event) {
+        event.stopPropagation();
+        if (productImages.length <= 1) return;
+        if (currentSlide > 0) {
+            currentSlide--;
+        } else {
+            currentSlide = productImages.length - 1;
+        }
+        updateSlider();
+    }
+
+    function nextSlide(event) {
+        event.stopPropagation();
+        if (productImages.length <= 1) return;
+        if (currentSlide < productImages.length - 1) {
+            currentSlide++;
+        } else {
+            currentSlide = 0;
+        }
+        updateSlider();
+    }
+    
+    // Fungsi baru untuk menambahkan produk ke keranjang menggunakan localStorage
+    function addToCart(productId, productName, productPrice, productImage, event) {
+        if (event) {
+            event.stopPropagation();
+        }
+
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        const existingItem = cart.find(item => item.product_id === productId);
+
+        if (existingItem) {
+            existingItem.jumlah += 1;
+        } else {
+            cart.push({
+                product_id: productId,
+                product_name: productName,
+                product_price: productPrice,
+                product_image: productImage,
+                jumlah: 1
+            });
+        }
+
+        localStorage.setItem('cart', JSON.stringify(cart));
+        showFlashMessage('success', 'Produk berhasil ditambahkan ke keranjang!');
+        updateCartCountInNavbar();
+    }
+
+    // Fungsi helper untuk menampilkan flash message sementara
+    function showFlashMessage(type, message) {
+        const flashContainer = document.getElementById('flash-messages');
+        if (!flashContainer) return;
+
+        const flashMessageDiv = document.createElement('div');
+        flashMessageDiv.className = `flash-message flash-${type} fixed bottom-20 left-1/2 -translate-x-1/2 p-4 rounded-md shadow-lg z-50`;
+        flashMessageDiv.textContent = message;
+
+        flashContainer.appendChild(flashMessageDiv);
+
+        setTimeout(() => {
+            flashMessageDiv.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+            setTimeout(() => flashMessageDiv.remove(), 500); 
+        }, 3000);
+    }
+</script>
+{% endblock %}
